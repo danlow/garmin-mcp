@@ -1,5 +1,6 @@
 """Browser dashboard: one static page plus a JSON endpoint it reads from."""
 
+import logging
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -8,8 +9,10 @@ from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from . import insights
-from .auth import LOGIN_PATH, LOGOUT_PATH, SESSION_DAYS, Sessions
+from .auth import LOGIN_PATH, LOGOUT_PATH, SESSION_DAYS, Sessions, visitor
 from .db import Database
+
+log = logging.getLogger("garmin.dashboard")
 
 PAGE = Path(__file__).parent / "static" / "dashboard.html"
 LOGIN_PAGE = Path(__file__).parent / "static" / "login.html"
@@ -74,21 +77,24 @@ def register(mcp: FastMCP, db: Database, sessions: Sessions) -> None:
 
     @mcp.custom_route(LOGIN_PATH, methods=["POST"])
     async def login(request: Request) -> RedirectResponse:
-        client = request.client.host if request.client else "unknown"
+        client, https = visitor(request)
         if sessions.locked_out(client):
+            log.warning("dashboard sign-in refused, locked out: %s", client)
             return RedirectResponse(f"{LOGIN_PATH}?error=locked", status_code=303)
         form = await request.form()
         if not sessions.check(str(form.get("username", "")), str(form.get("password", ""))):
             sessions.record_failure(client)
+            log.warning("dashboard sign-in failed: %s", client)
             return RedirectResponse(f"{LOGIN_PATH}?error=invalid", status_code=303)
+        log.info("dashboard sign-in: %s%s", client, " (https)" if https else "")
         response = RedirectResponse("/dashboard", status_code=303)
-        response.headers["set-cookie"] = sessions.set_cookie(sessions.issue(), SESSION_DAYS * 86400)
+        response.headers["set-cookie"] = sessions.set_cookie(sessions.issue(), SESSION_DAYS * 86400, https)
         return response
 
     @mcp.custom_route(LOGOUT_PATH, methods=["GET", "POST"])
-    async def logout(_: Request) -> RedirectResponse:
+    async def logout(request: Request) -> RedirectResponse:
         response = RedirectResponse(LOGIN_PATH, status_code=303)
-        response.headers["set-cookie"] = sessions.set_cookie("", 0)
+        response.headers["set-cookie"] = sessions.set_cookie("", 0, visitor(request)[1])
         return response
 
     @mcp.custom_route("/dashboard", methods=["GET"])

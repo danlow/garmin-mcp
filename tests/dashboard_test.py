@@ -85,6 +85,29 @@ s, _, _ = req("POST", "/mcp", {"Cookie": session, "Content-Type": "application/j
 check(s == 401, f"session cookie must not open /mcp, got {s}")
 print("tampered cookie refused; session cookie doesn't open /mcp")
 
+# Behind Tailscale Funnel: lockout is per visitor (X-Forwarded-For from the proxy), the
+# visitor can't choose their own address, and the cookie is Secure only over HTTPS.
+FORM = {"Content-Type": "application/x-www-form-urlencoded"}
+def proxied_login(visitor_ip: str, password: str, https: bool = True, spoof: str = ""):
+    headers = {**FORM, "X-Forwarded-For": f"{spoof}, {visitor_ip}" if spoof else visitor_ip}
+    if https:
+        headers["X-Forwarded-Proto"] = "https"
+    return req("POST", "/dashboard/login", headers, urllib.parse.urlencode({"username": USER, "password": password}))
+
+attacker, me = "203.0.113.9", "198.51.100.7"
+for _ in range(5):
+    proxied_login(attacker, "wrong")
+s, h, _ = proxied_login(attacker, PW)
+check(h["location"].endswith("error=locked"), f"attacker should be locked out, got {h['location']}")
+s, h, _ = proxied_login(attacker, PW, spoof=me)
+check(h["location"].endswith("error=locked"), "a spoofed X-Forwarded-For entry must not escape the lockout")
+s, h, _ = proxied_login(me, PW)
+check(h.get("location") == "/dashboard" and "Secure" in h.get("set-cookie", ""),
+      f"another visitor must still get in, with a Secure cookie over https: {h}")
+s, h, _ = proxied_login("198.51.100.8", PW, https=False)
+check("Secure" not in h.get("set-cookie", "x"), "plain-HTTP sign-in must not set Secure (LAN address)")
+print("behind a proxy: lockout per visitor, spoofing doesn't help, Secure cookie only over https")
+
 # Sign out clears the cookie.
 s, h, _ = req("GET", "/dashboard/logout", {"Cookie": session})
 check(s == 303 and "Max-Age=0" in h.get("set-cookie", ""), f"logout: {s} {h}")

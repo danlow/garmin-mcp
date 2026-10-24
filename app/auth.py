@@ -2,6 +2,7 @@ import base64
 import binascii
 import hashlib
 import hmac
+import ipaddress
 import json
 import time
 from collections import defaultdict, deque
@@ -56,9 +57,34 @@ class Sessions:
                 and hmac.compare_digest(sig, self._sign(expires)))
 
     @staticmethod
-    def set_cookie(value: str, max_age: int) -> str:
-        # No Secure flag: the dashboard is served over plain HTTP on the LAN / Tailscale.
-        return f"{SESSION_COOKIE}={value}; Path=/dashboard; HttpOnly; SameSite=Strict; Max-Age={max_age}"
+    def set_cookie(value: str, max_age: int, secure: bool) -> str:
+        # Secure only when the visitor came over HTTPS (Tailscale Funnel); the LAN address is plain HTTP.
+        flags = "; Secure" if secure else ""
+        return f"{SESSION_COOKIE}={value}; Path=/dashboard; HttpOnly; SameSite=Strict; Max-Age={max_age}{flags}"
+
+
+def _private(address: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(address)
+    except ValueError:
+        return False
+    return ip.is_private or ip.is_loopback
+
+
+def visitor(request) -> tuple[str, bool]:
+    """The real visitor address, and whether they came over HTTPS.
+
+    Behind Tailscale Funnel and Docker's port proxy every request reaches the app from the same
+    local address; the proxy passes the visitor in X-Forwarded-For / X-Forwarded-Proto. Those
+    headers are only trusted from private or loopback peers, and the right-most X-Forwarded-For
+    entry (the one the nearest proxy added) is used, so a visitor can't pick their own address.
+    """
+    peer = request.client.host if request.client else ""
+    if not _private(peer):
+        return peer or "unknown", False
+    forwarded = [p.strip() for p in request.headers.get("x-forwarded-for", "").split(",") if p.strip()]
+    https = request.headers.get("x-forwarded-proto", "").lower() == "https"
+    return (forwarded[-1] if forwarded else peer or "unknown"), https
 
 
 def _cookie(headers: dict, name: str) -> str:
