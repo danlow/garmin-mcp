@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fitness Dashboard</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.10);
+    --wash: rgba(11, 11, 11, 0.05);
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1baf7a;
+    --series-4: #eda100;
+    --series-5: #e87ba4;
+    --series-6: #008300;
+    --series-other: #898781;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page: #0d0d0d;
+      --surface: #1a1a19;
+      --text-primary: #f0efec;
+      --text-secondary: #c3c2b7;
+      --muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --border: rgba(255, 255, 255, 0.10);
+      --wash: rgba(255, 255, 255, 0.06);
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #199e70;
+      --series-4: #c98500;
+      --series-5: #d55181;
+      --series-6: #008300;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --text-primary: #f0efec;
+    --text-secondary: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --wash: rgba(255, 255, 255, 0.06);
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--text-primary);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 1120px; margin: 0 auto; padding: 24px 16px 48px; }
+
+  header { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; justify-content: space-between; margin-bottom: 20px; }
+  h1 { font-size: 22px; font-weight: 650; margin: 0; letter-spacing: -0.01em; }
+  .sub { color: var(--text-secondary); margin-top: 2px; }
+  .badge { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border);
+           color: var(--text-secondary); font-size: 12px; vertical-align: 2px; }
+
+  .range { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); padding: 2px; }
+  .range button { border: 0; background: none; color: var(--text-secondary); font: inherit; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+  .range button:hover { background: var(--wash); }
+  .range button[aria-pressed="true"] { background: var(--wash); color: var(--text-primary); font-weight: 600; }
+
+  .tiles { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+  @media (max-width: 1000px) { .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 520px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .tile, .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+  .tile { padding: 14px 16px; }
+  .tile .label { color: var(--text-secondary); font-size: 13px; }
+  .tile .value { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; margin-top: 2px; }
+  .tile .value small { font-size: 14px; font-weight: 500; color: var(--text-secondary); margin-left: 2px; }
+  .tile .delta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .grid .wide { grid-column: 1 / -1; }
+  @media (max-width: 760px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+  .card { padding: 16px; position: relative; min-width: 0; }
+  .card h2 { font-size: 15px; font-weight: 600; margin: 0; }
+  .card .note { color: var(--text-secondary); font-size: 13px; margin: 2px 0 10px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0 0 8px; padding: 0; list-style: none; color: var(--text-secondary); font-size: 13px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  .chart { position: relative; width: 100%; }
+  .chart svg { display: block; width: 100%; overflow: visible; }
+  .axis text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .tip { position: absolute; pointer-events: none; z-index: 2; background: var(--surface); border: 1px solid var(--border);
+         border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12); white-space: nowrap; display: none; }
+  .tip b { display: block; margin-bottom: 2px; }
+  .tip .row { display: flex; gap: 12px; justify-content: space-between; color: var(--text-secondary); }
+  .tip .row span:last-child { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+
+  details { margin-top: 8px; }
+  summary { cursor: pointer; color: var(--text-secondary); font-size: 13px; }
+  .scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  th { color: var(--text-secondary); font-weight: 500; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .empty { color: var(--muted); padding: 24px 0; text-align: center; }
+  .error { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .loading { opacity: .55; transition: opacity .15s; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Fitness <span class="badge" id="sample" hidden>Sample data</span></h1>
+      <div class="sub" id="sub">Loading…</div>
+    </div>
+    <div class="range" role="group" aria-label="Date range">
+      <button type="button" data-days="7">7 days</button>
+      <button type="button" data-days="30">30 days</button>
+      <button type="button" data-days="90">90 days</button>
+    </div>
+  </header>
+
+  <div id="error" class="error" hidden></div>
+  <div id="content">
+    <section class="tiles" id="tiles" aria-label="Summary"></section>
+    <section class="grid">
+      <article class="card wide">
+        <h2>Training time</h2>
+        <p class="note" id="trainingNote">Hours per day, by sport</p>
+        <ul class="legend" id="trainingLegend"></ul>
+        <div class="chart" id="training"></div>
+        <details><summary>Show as table</summary><div class="scroll" id="trainingTable"></div></details>
+      </article>
+      <article class="card">
+        <h2>Sleep</h2>
+        <p class="note">Hours per night</p>
+        <div class="chart" id="sleep"></div>
+        <details><summary>Show as table</summary><div class="scroll" id="sleepTable"></div></details>
+      </article>
+      <article class="card">
+        <h2>HRV</h2>
+        <p class="note">Overnight average, ms</p>
+        <div class="chart" id="hrv"></div>
+        <details><summary>Show as table</summary><div class="scroll" id="hrvTable"></div></details>
+      </article>
+      <article class="card">
+        <h2>Resting heart rate</h2>
+        <p class="note">Beats per minute</p>
+        <div class="chart" id="rhr"></div>
+        <details><summary>Show as table</summary><div class="scroll" id="rhrTable"></div></details>
+      </article>
+      <article class="card">
+        <h2>Steps</h2>
+        <p class="note">Per day</p>
+        <div class="chart" id="steps"></div>
+        <details><summary>Show as table</summary><div class="scroll" id="stepsTable"></div></details>
+      </article>
+      <article class="card wide">
+        <h2>Recent activities</h2>
+        <p class="note">Newest first</p>
+        <div class="scroll" id="activities"></div>
+      </article>
+    </section>
+  </div>
+</main>
+
+<script>
+(() => {
+  // Fixed slot order (validated adjacent pairs), so a sport keeps its colour whatever the range shows.
+  const SPORTS = [
+    { key: "running", label: "Running", color: "--series-1" },
+    { key: "cardio", label: "Cardio", color: "--series-2" },
+    { key: "strength", label: "Strength", color: "--series-3" },
+    { key: "walking", label: "Walking", color: "--series-4" },
+    { key: "cycling", label: "Cycling", color: "--series-5" },
+    { key: "swimming", label: "Swimming", color: "--series-6" },
+  ];
+  const OTHER = { key: "other", label: "Other", color: "--series-other" };
+  // Garmin type keys are specific (track_running, indoor_cardio, road_biking...): group by family.
+  const FAMILIES = [
+    [/run/, "running"], [/cardio|hiit|elliptical|stair|rowing|aerobic/, "cardio"], [/strength|weight/, "strength"],
+    [/walk|hik/, "walking"], [/cycl|bik|ride|spin/, "cycling"], [/swim/, "swimming"],
+  ];
+  const sportOf = (type) => {
+    const family = (FAMILIES.find(([re]) => re.test(type || "")) || [])[1];
+    return SPORTS.find((s) => s.key === family) || OTHER;
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const fmtDay = (iso) => { const [, m, d] = iso.split("-").map(Number); return `${MONTHS[m - 1]} ${d}`; };
+  const fmtHours = (h) => { if (h == null) return "–"; const m = Math.round(h * 60); return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`; };
+  const fmtNum = (v, digits = 0) => v == null ? "–" : Number(v).toLocaleString(undefined, { maximumFractionDigits: digits, minimumFractionDigits: digits });
+
+  let state = { days: 30, data: null };
+  try { const saved = Number(localStorage.getItem("garmin-dash-days")); if ([7, 30, 90].includes(saved)) state.days = saved; } catch (_) {}
+
+  // ---------- data ----------
+
+  async function load() {
+    document.querySelectorAll(".range button").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.days) === state.days)));
+    $("content").classList.add("loading");
+    try {
+      const res = await fetch(`/dashboard/api?days=${state.days}`, { credentials: "same-origin" });
+      if (!res.ok) throw new Error(`Server answered ${res.status}`);
+      state.data = await res.json();
+      $("error").hidden = true;
+      render();
+    } catch (e) {
+      $("error").hidden = false;
+      $("error").textContent = `Couldn't load data: ${e.message}. Showing the last loaded view.`;
+    } finally {
+      $("content").classList.remove("loading");
+    }
+  }
+
+  // Training buckets: daily for 7/30 days, weekly (Mon-start) for 90.
+  function trainingBuckets(days, weekly) {
+    if (!weekly) return days.map((d) => ({ label: fmtDay(d.day), title: fmtDay(d.day), values: d.training_h }));
+    const out = [];
+    for (const d of days) {
+      const dt = new Date(d.day + "T00:00:00Z");
+      const monday = new Date(dt); monday.setUTCDate(dt.getUTCDate() - ((dt.getUTCDay() + 6) % 7));
+      const key = monday.toISOString().slice(0, 10);
+      let b = out[out.length - 1];
+      if (!b || b.key !== key) { b = { key, label: fmtDay(key), title: `Week of ${fmtDay(key)}`, values: {} }; out.push(b); }
+      for (const [k, v] of Object.entries(d.training_h)) b.values[k] = +((b.values[k] || 0) + v).toFixed(2);
+    }
+    return out;
+  }
+
+  // ---------- render ----------
+
+  function render() {
+    const d = state.data;
+    const ago = d.sync.last_successful_sync ? timeAgo(d.sync.last_successful_sync) : "never";
+    $("sub").textContent = `${fmtDay(d.range.from)} – ${fmtDay(d.range.to)} · synced ${ago}`;
+    $("sample").hidden = !d.recent_activities.some((a) => String(a.id).startsWith("fake-"));
+
+    renderTiles(d.totals, d.previous_totals, d.range.days);
+
+    const weekly = d.range.days > 30;
+    $("trainingNote").textContent = weekly ? "Hours per week, by sport" : "Hours per day, by sport";
+    const present = new Set(d.days.flatMap((x) => Object.keys(x.training_h)).map((k) => sportOf(k).key));
+    const series = [...SPORTS, OTHER].filter((s) => present.has(s.key));
+    $("trainingLegend").innerHTML = series.map((s) => `<li><i style="background:var(${s.color})"></i>${s.label}</li>`).join("");
+    const buckets = trainingBuckets(d.days, weekly).map((b) => {
+      const v = {};
+      for (const [k, h] of Object.entries(b.values)) { const key = sportOf(k).key; v[key] = (v[key] || 0) + h; }
+      return { ...b, values: v };
+    });
+    stackedBars($("training"), buckets, series, (v) => fmtHours(v));
+    $("trainingTable").innerHTML = table(
+      [weekly ? "Week of" : "Day", ...series.map((s) => s.label), "Total"],
+      buckets.map((b) => [b.label, ...series.map((s) => b.values[s.key] ? fmtHours(b.values[s.key]) : "–"),
+        fmtHours(series.reduce((t, s) => t + (b.values[s.key] || 0), 0))]), 1);
+
+    const pts = (field) => d.days.map((x) => ({ label: fmtDay(x.day), value: x[field] }));
+    bars($("sleep"), pts("sleep_h"), fmtHours, { extra: (i) => d.days[i].sleep_score != null ? [["Sleep score", d.days[i].sleep_score]] : [] });
+    $("sleepTable").innerHTML = table(["Night", "Sleep", "Score"], d.days.map((x) => [fmtDay(x.day), fmtHours(x.sleep_h), fmtNum(x.sleep_score)]), 1);
+
+    line($("hrv"), pts("hrv_ms"), (v) => `${fmtNum(v)} ms`);
+    $("hrvTable").innerHTML = table(["Night", "HRV (ms)"], d.days.map((x) => [fmtDay(x.day), fmtNum(x.hrv_ms)]), 1);
+
+    line($("rhr"), pts("resting_hr"), (v) => `${fmtNum(v)} bpm`);
+    $("rhrTable").innerHTML = table(["Day", "Resting HR (bpm)"], d.days.map((x) => [fmtDay(x.day), fmtNum(x.resting_hr)]), 1);
+
+    bars($("steps"), pts("steps"), (v) => fmtNum(v));
+    $("stepsTable").innerHTML = table(["Day", "Steps"], d.days.map((x) => [fmtDay(x.day), fmtNum(x.steps)]), 1);
+
+    $("activities").innerHTML = d.recent_activities.length ? table(
+      ["Date", "Sport", "Name", "Duration", "Distance", "Avg HR", "Calories"],
+      d.recent_activities.map((a) => [
+        fmtDay(a.start_time.slice(0, 10)), sportOf(a.activity_type).label === "Other" ? a.activity_type : sportOf(a.activity_type).label,
+        a.name, fmtHours(a.duration_s / 3600), a.distance_m ? `${fmtNum(a.distance_m / 1000, 1)} km` : "–",
+        a.avg_hr ? `${fmtNum(a.avg_hr)} bpm` : "–", fmtNum(a.calories)]), 3)
+      : `<div class="empty">No activities in this range</div>`;
+  }
+
+  function renderTiles(t, p, n) {
+    // Before the first synced day, a zero count is "no data", not "no training".
+    const prevHasData = p.activities > 0 || p.sleep_h != null || p.steps != null;
+    const tile = (label, value, unit, cur, prev, fmtDelta) => {
+      let delta = `No data for the previous ${n} days`;
+      if (prevHasData && cur != null && prev != null) {
+        const diff = cur - prev;
+        delta = Math.abs(diff) < 1e-9 ? `Same as previous ${n} days`
+          : `${diff > 0 ? "▲" : "▼"} ${fmtDelta(Math.abs(diff))} vs previous ${n} days`;
+      }
+      return `<div class="tile"><div class="label">${label}</div><div class="value">${value}${unit ? `<small>${unit}</small>` : ""}</div><div class="delta">${delta}</div></div>`;
+    };
+    $("tiles").innerHTML = [
+      tile("Activities", fmtNum(t.activities), "", t.activities, p.activities, (v) => fmtNum(v)),
+      tile("Training time", fmtHours(t.training_h), "", t.training_h, p.training_h, fmtHours),
+      tile("Distance", fmtNum(t.distance_km, 1), "km", t.distance_km, p.distance_km, (v) => `${fmtNum(v, 1)} km`),
+      tile("Avg sleep", fmtHours(t.sleep_h), "", t.sleep_h, p.sleep_h, fmtHours),
+      tile("Avg HRV", fmtNum(t.hrv_ms), "ms", t.hrv_ms, p.hrv_ms, (v) => `${fmtNum(v, 1)} ms`),
+      tile("Avg resting HR", fmtNum(t.resting_hr), "bpm", t.resting_hr, p.resting_hr, (v) => `${fmtNum(v, 1)} bpm`),
+    ].join("");
+  }
+
+  function table(head, rows, textCols) {
+    return `<table><thead><tr>${head.map((h, i) => `<th${i >= textCols ? ' class="num"' : ""}>${esc(h)}</th>`).join("")}</tr></thead>` +
+      `<tbody>${rows.map((r) => `<tr>${r.map((c, i) => `<td${i >= textCols ? ' class="num"' : ""}>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+  }
+
+  function timeAgo(iso) {
+    const s = (Date.now() - new Date(iso).getTime()) / 1000;
+    if (s < 90) return "just now";
+    if (s < 5400) return `${Math.round(s / 60)} min ago`;
+    if (s < 129600) return `${Math.round(s / 3600)} h ago`;
+    return `${Math.round(s / 86400)} days ago`;
+  }
+
+  // ---------- chart primitives (plain SVG) ----------
+
+  const H = 200, M = { top: 12, right: 12, bottom: 24, left: 40 };
+  const NS = "http://www.w3.org/2000/svg";
+
+  function niceScale(max, ticks = 4) {
+    if (!(max > 0)) return { max: 1, step: 0.25 };
+    const raw = max / ticks, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw);
+    return { max: step * Math.ceil(max / step), step };
+  }
+  function domain(values, padFrac = 0.15) {
+    const v = values.filter((x) => x != null);
+    if (!v.length) return { min: 0, max: 1, step: 0.25 };
+    let lo = Math.min(...v), hi = Math.max(...v);
+    const pad = Math.max((hi - lo) * padFrac, 1);
+    lo -= pad; hi += pad;
+    const raw = (hi - lo) / 4, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw);
+    return { min: Math.floor(lo / step) * step, max: Math.ceil(hi / step) * step, step };
+  }
+
+  function frame(el, n) {
+    el.innerHTML = "";
+    const W = Math.max(280, el.clientWidth);
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    svg.setAttribute("height", H);
+    svg.setAttribute("role", "img");
+    el.appendChild(svg);
+    const tip = document.createElement("div");
+    tip.className = "tip";
+    el.appendChild(tip);
+    const plotW = W - M.left - M.right, plotH = H - M.top - M.bottom;
+    return { svg, tip, W, plotW, plotH, band: plotW / Math.max(n, 1) };
+  }
+  const node = (svg, tag, attrs, parent) => {
+    const e = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+    (parent || svg).appendChild(e);
+    return e;
+  };
+
+  function axes(f, labels, yMin, yMax, step, fmtTick) {
+    const g = node(f.svg, "g", { class: "axis" });
+    const y = (v) => M.top + f.plotH - ((v - yMin) / (yMax - yMin)) * f.plotH;
+    for (let v = yMin; v <= yMax + step / 1000; v += step) {
+      node(f.svg, "line", { x1: M.left, x2: f.W - M.right, y1: y(v), y2: y(v), stroke: v === yMin ? "var(--baseline)" : "var(--grid)", "stroke-width": 1, "shape-rendering": "crispEdges" }, g);
+      const t = node(f.svg, "text", { x: M.left - 6, y: y(v) + 4, "text-anchor": "end" }, g);
+      t.textContent = fmtTick(v);
+    }
+    const every = Math.ceil(labels.length / Math.max(1, Math.floor(f.plotW / 64)));
+    labels.forEach((l, i) => {
+      if (i % every !== 0) return;
+      const t = node(f.svg, "text", { x: M.left + f.band * (i + 0.5), y: H - 6, "text-anchor": "middle" }, g);
+      t.textContent = l;
+    });
+    return y;
+  }
+
+  // Full-height hover bands, wider than the marks, driving one tooltip per chart.
+  function hover(f, el, n, onEnter) {
+    let marker = null;
+    for (let i = 0; i < n; i++) {
+      const r = node(f.svg, "rect", { x: M.left + f.band * i, y: M.top, width: f.band, height: f.plotH, fill: "transparent" });
+      r.addEventListener("mouseenter", () => {
+        if (marker) marker.remove();
+        const { title, rows, x, y, mark } = onEnter(i);
+        marker = mark ? mark() : null;
+        f.tip.innerHTML = `<b>${esc(title)}</b>` + rows.map(([k, v]) => `<div class="row"><span>${esc(k)}</span><span>${esc(v)}</span></div>`).join("");
+        f.tip.style.display = "block";
+        const scale = el.clientWidth / f.W;
+        const left = Math.min(Math.max(0, x * scale - f.tip.offsetWidth / 2), el.clientWidth - f.tip.offsetWidth);
+        f.tip.style.left = `${left}px`;
+        f.tip.style.top = `${Math.max(0, y - f.tip.offsetHeight - 10)}px`;
+      });
+    }
+    f.svg.addEventListener("mouseleave", () => { f.tip.style.display = "none"; if (marker) marker.remove(); marker = null; });
+  }
+
+  function topRounded(x, y, w, h, r) {
+    r = Math.min(r, w / 2, h);
+    return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+  }
+  const barGeom = (f, i) => { const w = Math.max(2, Math.min(f.band - Math.max(2, f.band * 0.28), 36)); return { x: M.left + f.band * i + (f.band - w) / 2, w }; };
+
+  function stackedBars(el, buckets, series, fmt) {
+    const totals = buckets.map((b) => series.reduce((t, s) => t + (b.values[s.key] || 0), 0));
+    const f = frame(el, buckets.length);
+    const { max, step } = niceScale(Math.max(...totals, 0.5));
+    const y = axes(f, buckets.map((b) => b.label), 0, max, step, (v) => `${+v.toFixed(2)}h`);
+    buckets.forEach((b, i) => {
+      const { x, w } = barGeom(f, i);
+      let base = y(0);
+      const segs = series.filter((s) => b.values[s.key] > 0);
+      segs.forEach((s, j) => {
+        const h = y(0) - y(b.values[s.key]);
+        const top = j === segs.length - 1;
+        const gap = j > 0 ? 2 : 0;  // 2px surface gap between stacked segments
+        const segH = Math.max(1, h - gap);
+        const yTop = base - h;
+        const d = top ? topRounded(x, yTop, w, segH, 4) : `M${x},${yTop}h${w}v${segH}h${-w}Z`;
+        node(f.svg, "path", { d, style: `fill:var(${s.color})` });
+        base -= h;
+      });
+    });
+    hover(f, el, buckets.length, (i) => {
+      const b = buckets[i];
+      const rows = series.filter((s) => b.values[s.key] > 0).map((s) => [s.label, fmt(b.values[s.key])]);
+      rows.push(["Total", fmt(totals[i])]);
+      return { title: b.title, rows: totals[i] ? rows : [["Rest day", ""]], x: M.left + f.band * (i + 0.5), y: y(totals[i]) };
+    });
+  }
+
+  function bars(el, points, fmt, opts = {}) {
+    const vals = points.map((p) => p.value);
+    if (!vals.some((v) => v != null)) { el.innerHTML = `<div class="empty">No data in this range</div>`; return; }
+    const f = frame(el, points.length);
+    const { max, step } = niceScale(Math.max(...vals.filter((v) => v != null)));
+    const y = axes(f, points.map((p) => p.label), 0, max, step, (v) => fmtCompact(v));
+    points.forEach((p, i) => {
+      if (p.value == null) return;
+      const { x, w } = barGeom(f, i);
+      node(f.svg, "path", { d: topRounded(x, y(p.value), w, y(0) - y(p.value), 4), style: "fill:var(--series-1)" });
+    });
+    hover(f, el, points.length, (i) => ({
+      title: points[i].label,
+      rows: [["Value", fmt(points[i].value)], ...(opts.extra ? opts.extra(i) : [])],
+      x: M.left + f.band * (i + 0.5), y: y(points[i].value ?? 0),
+    }));
+  }
+
+  function line(el, points, fmt) {
+    const vals = points.map((p) => p.value);
+    if (!vals.some((v) => v != null)) { el.innerHTML = `<div class="empty">No data in this range</div>`; return; }
+    const f = frame(el, points.length);
+    const dom = domain(vals);
+    const y = axes(f, points.map((p) => p.label), dom.min, dom.max, dom.step, (v) => fmtCompact(v));
+    const cx = (i) => M.left + f.band * (i + 0.5);
+    let d = "", pen = false;
+    points.forEach((p, i) => {
+      if (p.value == null) { pen = false; return; }
+      d += `${pen ? "L" : "M"}${cx(i)},${y(p.value)}`;
+      pen = true;
+    });
+    node(f.svg, "path", { d, fill: "none", stroke: "var(--series-1)", "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" });
+    // Direct label on the latest value only.
+    const last = points.map((p, i) => [p, i]).filter(([p]) => p.value != null).pop();
+    if (last) {
+      node(f.svg, "circle", { cx: cx(last[1]), cy: y(last[0].value), r: 4, fill: "var(--series-1)", stroke: "var(--surface)", "stroke-width": 2 });
+    }
+    hover(f, el, points.length, (i) => ({
+      title: points[i].label,
+      rows: [["Value", fmt(points[i].value)]],
+      x: cx(i), y: points[i].value == null ? M.top + f.plotH / 2 : y(points[i].value),
+      mark: () => {
+        const g = node(f.svg, "g", { "pointer-events": "none" });
+        node(f.svg, "line", { x1: cx(i), x2: cx(i), y1: M.top, y2: M.top + f.plotH, stroke: "var(--baseline)", "stroke-width": 1 }, g);
+        if (points[i].value != null) node(f.svg, "circle", { cx: cx(i), cy: y(points[i].value), r: 5, fill: "var(--series-1)", stroke: "var(--surface)", "stroke-width": 2 }, g);
+        return g;
+      },
+    }));
+  }
+
+  const fmtCompact = (v) => Math.abs(v) >= 1000 ? `${+(v / 1000).toFixed(1)}k` : `${+v.toFixed(1)}`;
+
+  // ---------- wiring ----------
+
+  document.querySelectorAll(".range button").forEach((b) => b.addEventListener("click", () => {
+    state.days = Number(b.dataset.days);
+    try { localStorage.setItem("garmin-dash-days", String(state.days)); } catch (_) {}
+    load();
+  }));
+  let resizeTimer;
+  window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => state.data && render(), 150); });
+  load();
+  setInterval(load, 15 * 60 * 1000);
+})();
+</script>
+</body>
+</html>

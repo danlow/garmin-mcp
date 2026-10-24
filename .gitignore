@@ -1,0 +1,30 @@
+# Secrets: MCP token, dashboard password, Garmin API key
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_*
+secrets/
+
+# Personal health data (SQLite database, downloaded FIT files)
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.fit
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,19 @@
+services:
+  garmin-mcp:
+    build: .
+    image: garmin-mcp:local
+    container_name: garmin-mcp
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - garmin-data:/data
+      # Garmin dates everything by local day, so use the server's time zone.
+      - /etc/localtime:/etc/localtime:ro
+    labels:
+      # Built locally, so there's nothing for Watchtower to pull.
+      - com.centurylinklabs.watchtower.enable=false
+
+volumes:
+  garmin-data:
