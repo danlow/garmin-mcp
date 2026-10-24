@@ -11,10 +11,13 @@ log = logging.getLogger("garmin.sync")
 class Syncer:
     """Pulls recent data from Garmin into SQLite on a timer, and on demand."""
 
-    def __init__(self, db: Database, source: Source, interval_min: int, initial_days: int, lookback_days: int):
+    def __init__(self, db: Database, source: Source, interval_min: int, initial_days: int, lookback_days: int,
+                 stale_after_min: int | None = None):
         self.db = db
         self.source = source
         self.interval_s = interval_min * 60
+        # /health/sync reports "stale" after this long without a successful sync (default: 3 missed runs).
+        self.stale_after_min = stale_after_min or max(30, 3 * interval_min)
         self.initial_days = initial_days
         self.lookback_days = lookback_days
         self._run_lock = threading.Lock()

@@ -7,7 +7,7 @@ import json
 import time
 from collections import defaultdict, deque
 
-OPEN_PATHS = ("/health",)
+OPEN_PATHS = ("/health", "/health/sync")
 DASHBOARD_PREFIX = "/dashboard"
 LOGIN_PATH = "/dashboard/login"
 LOGOUT_PATH = "/dashboard/logout"

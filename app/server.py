@@ -1,5 +1,5 @@
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import uvicorn
@@ -55,6 +55,22 @@ def build_server(db: Database, syncer: Syncer, sessions: Sessions) -> FastMCP:
     @mcp.custom_route("/health", methods=["GET"])
     async def health(_: Request) -> JSONResponse:
         return JSONResponse({"status": "ok"})
+
+    @mcp.custom_route("/health/sync", methods=["GET"])
+    async def sync_health(_: Request) -> JSONResponse:
+        """503 when the last successful Garmin sync is older than SYNC_STALE_MIN, for outside monitors."""
+        overview = db.sync_overview()
+        last_ok, last_run = overview["last_successful_sync"], overview["last_run"]
+        age = round((datetime.now(timezone.utc) - datetime.fromisoformat(last_ok)).total_seconds() / 60) if last_ok else None
+        fresh = age is not None and age <= syncer.stale_after_min
+        running = bool(last_run and last_run["finished_at"] is None)
+        return JSONResponse({
+            "status": "ok" if fresh else "stale",
+            "minutes_since_last_success": age,
+            "stale_after_min": syncer.stale_after_min,
+            "last_run": "running" if running else ("ok" if last_run and last_run["ok"] else "failed" if last_run else "never"),
+            "last_error": None if running else (last_run or {}).get("error"),
+        }, status_code=200 if fresh else 503)
 
     dashboard.register(mcp, db, sessions)
 
@@ -127,7 +143,7 @@ def main() -> None:
     source = make_source(cfg.source, cfg.garmin_api_key)
     if cfg.source != "fake" and (n := db.purge_sample_data()):
         logging.info("removed %d sample-data rows", n)
-    syncer = Syncer(db, source, cfg.sync_interval_min, cfg.initial_days, cfg.lookback_days)
+    syncer = Syncer(db, source, cfg.sync_interval_min, cfg.initial_days, cfg.lookback_days, cfg.stale_after_min)
     syncer.start()
     sessions = Sessions(cfg.dashboard_username, cfg.dashboard_password, cfg.token)
     app = Auth(build_server(db, syncer, sessions).streamable_http_app(), cfg.token, sessions)

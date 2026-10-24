@@ -14,6 +14,7 @@ class Config:
     sync_interval_min: int
     initial_days: int
     lookback_days: int
+    stale_after_min: int  # 0 = 3 x sync interval
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -31,4 +32,5 @@ class Config:
             sync_interval_min=int(os.environ.get("SYNC_INTERVAL_MIN", "60")),
             initial_days=int(os.environ.get("INITIAL_SYNC_DAYS", "180")),
             lookback_days=int(os.environ.get("LOOKBACK_DAYS", "3")),
+            stale_after_min=int(os.environ.get("SYNC_STALE_MIN") or 0),
         )

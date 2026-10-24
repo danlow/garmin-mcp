@@ -118,4 +118,12 @@ basic = "Basic " + base64.b64encode(f"{USER}:{PW}".encode()).decode()
 s, _, _ = req("GET", "/dashboard/api?days=7", {"Authorization": basic})
 check(s == 200, f"basic auth for scripts: {s}")
 print("HTTP Basic still works for scripts")
+
+# Sync freshness for outside monitors: open, and agrees with the database.
+s, _, body = req("GET", "/health/sync")
+j = json.loads(body)
+check(s in (200, 503) and j["status"] == ("ok" if s == 200 else "stale") and "minutes_since_last_success" in j
+      and "stale_after_min" in j, f"/health/sync: {s} {j}")
+print(f"/health/sync: {s} {j['status']}, last success {j['minutes_since_last_success']} min ago "
+      f"(stale after {j['stale_after_min']})")
 print("ALL OK")
