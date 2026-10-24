@@ -23,6 +23,12 @@
     --series-5: #e87ba4;
     --series-6: #008300;
     --series-other: #898781;
+    /* Ordinal intensity ramp, low to high (validated with --ordinal). */
+    --int-1: #86b6ef;
+    --int-2: #5598e7;
+    --int-3: #2a78d6;
+    --int-4: #1c5cab;
+    --int-5: #104281;
   }
   @media (prefers-color-scheme: dark) {
     :root:where(:not([data-theme="light"])) {
@@ -42,6 +48,11 @@
       --series-4: #c98500;
       --series-5: #d55181;
       --series-6: #008300;
+      --int-1: #184f95;
+      --int-2: #256abf;
+      --int-3: #3987e5;
+      --int-4: #6da7ec;
+      --int-5: #9ec5f4;
     }
   }
   :root[data-theme="dark"] {
@@ -61,9 +72,15 @@
     --series-4: #c98500;
     --series-5: #d55181;
     --series-6: #008300;
+    --int-1: #184f95;
+    --int-2: #256abf;
+    --int-3: #3987e5;
+    --int-4: #6da7ec;
+    --int-5: #9ec5f4;
   }
 
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body {
     margin: 0;
     background: var(--page);
@@ -78,6 +95,9 @@
   .badge { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border);
            color: var(--text-secondary); font-size: 12px; vertical-align: 2px; }
 
+  .controls { display: flex; align-items: center; gap: 16px; }
+  .signout { color: var(--text-secondary); font-size: 13px; text-decoration: none; }
+  .signout:hover { color: var(--text-primary); text-decoration: underline; }
   .range { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); padding: 2px; }
   .range button { border: 0; background: none; color: var(--text-secondary); font: inherit; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
   .range button:hover { background: var(--wash); }
@@ -99,6 +119,34 @@
   .card { padding: 16px; position: relative; min-width: 0; }
   .card h2 { font-size: 15px; font-weight: 600; margin: 0; }
   .card .note { color: var(--text-secondary); font-size: 13px; margin: 2px 0 10px; }
+  .section-title { grid-column: 1 / -1; font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+                   color: var(--text-secondary); margin: 12px 0 -4px; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px 16px; margin: 4px 0 14px; }
+  .stat .k { color: var(--text-secondary); font-size: 12px; }
+  .stat .v { font-size: 18px; font-weight: 600; }
+  .stat .d { color: var(--muted); font-size: 12px; }
+
+  .split { margin: 6px 0 4px; }
+  .split .row { display: grid; grid-template-columns: 64px 1fr; align-items: center; gap: 10px; margin: 8px 0; }
+  .split .name { color: var(--text-secondary); font-size: 13px; }
+  .split .bar { position: relative; display: flex; gap: 2px; height: 28px; }
+  .split .seg { height: 100%; min-width: 2px; display: flex; align-items: center; justify-content: center;
+                font-size: 12px; font-weight: 600; color: #fff; overflow: hidden; white-space: nowrap; }
+  .split .seg:first-child { border-radius: 4px 0 0 4px; }
+  .split .seg:last-child { border-radius: 0 4px 4px 0; }
+  .split .seg.light-ink { color: #0b0b0b; }
+  .split .target { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--text-primary); }
+  .verdict { margin: 10px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--text-secondary); }
+  .verdict li { margin: 4px 0; padding-left: 14px; position: relative; }
+  .verdict li::before { content: "•"; position: absolute; left: 2px; color: var(--muted); }
+
+  .hbars { list-style: none; margin: 8px 0 0; padding: 0; }
+  .hbars li { display: grid; grid-template-columns: 120px 1fr 64px; align-items: center; gap: 10px; margin: 6px 0; font-size: 13px; }
+  .hbars .lbl { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hbars .track { display: block; height: 10px; }
+  .hbars .fill { height: 100%; background: var(--series-1); border-radius: 0 4px 4px 0; min-width: 2px; }
+  .hbars .val { text-align: right; font-variant-numeric: tabular-nums; }
   .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0 0 8px; padding: 0; list-style: none; color: var(--text-secondary); font-size: 13px; }
   .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
   .chart { position: relative; width: 100%; }
@@ -129,10 +177,13 @@
       <h1>Fitness <span class="badge" id="sample" hidden>Sample data</span></h1>
       <div class="sub" id="sub">Loading…</div>
     </div>
-    <div class="range" role="group" aria-label="Date range">
-      <button type="button" data-days="7">7 days</button>
-      <button type="button" data-days="30">30 days</button>
-      <button type="button" data-days="90">90 days</button>
+    <div class="controls">
+      <div class="range" role="group" aria-label="Date range">
+        <button type="button" data-days="7">7 days</button>
+        <button type="button" data-days="30">30 days</button>
+        <button type="button" data-days="90">90 days</button>
+      </div>
+      <a class="signout" href="/dashboard/logout">Sign out</a>
     </div>
   </header>
 
@@ -147,6 +198,44 @@
         <div class="chart" id="training"></div>
         <details><summary>Show as table</summary><div class="scroll" id="trainingTable"></div></details>
       </article>
+
+      <h2 class="section-title">Training insights</h2>
+      <article class="card wide">
+        <h2>Training effect</h2>
+        <p class="note" id="effectNote">Hours by Garmin's primary benefit, easiest to hardest</p>
+        <div class="stats" id="effectStats"></div>
+        <ul class="legend" id="effectLegend"></ul>
+        <div class="chart" id="effect"></div>
+        <details><summary>Show as table</summary><div class="scroll" id="effectTable"></div></details>
+      </article>
+      <article class="card">
+        <h2>Intensity vs 80/20</h2>
+        <p class="note">Share of heart-rate time: easy (zones 1–2), moderate (zone 3), hard (zones 4–5)</p>
+        <ul class="legend" id="zoneLegend"></ul>
+        <div class="split" id="zoneSplit"></div>
+        <ul class="verdict" id="zoneVerdict"></ul>
+        <details><summary>Show as table</summary><div class="scroll" id="zoneTable"></div></details>
+      </article>
+      <article class="card">
+        <h2>Strength volume</h2>
+        <p class="note" id="strengthNote">Sets per day</p>
+        <div class="stats" id="strengthStats"></div>
+        <div class="chart" id="strength"></div>
+        <h2 style="margin-top:14px">Top exercises</h2>
+        <ul class="hbars" id="exercises"></ul>
+        <details><summary>Show as table</summary><div class="scroll" id="strengthTable"></div></details>
+      </article>
+      <article class="card wide">
+        <h2>Running</h2>
+        <p class="note" id="runNote">Kilometres per day, by type of run</p>
+        <div class="stats" id="runStats"></div>
+        <ul class="legend" id="runLegend"></ul>
+        <div class="chart" id="runs"></div>
+        <ul class="verdict" id="runVerdict"></ul>
+        <details><summary>Show as table</summary><div class="scroll" id="runTable"></div></details>
+      </article>
+
+      <h2 class="section-title">Recovery &amp; daily health</h2>
       <article class="card">
         <h2>Sleep</h2>
         <p class="note">Hours per night</p>
@@ -219,6 +308,7 @@
     $("content").classList.add("loading");
     try {
       const res = await fetch(`/dashboard/api?days=${state.days}`, { credentials: "same-origin" });
+      if (res.status === 401) { location.href = "/dashboard/login"; return; }  // session expired
       if (!res.ok) throw new Error(`Server answered ${res.status}`);
       state.data = await res.json();
       $("error").hidden = true;
@@ -231,20 +321,23 @@
     }
   }
 
-  // Training buckets: daily for 7/30 days, weekly (Mon-start) for 90.
-  function trainingBuckets(days, weekly) {
-    if (!weekly) return days.map((d) => ({ label: fmtDay(d.day), title: fmtDay(d.day), values: d.training_h }));
+  // Buckets of summed per-day values: daily for 7/30 days, weekly (Mon-start) for 90.
+  function bucketize(days, weekly, pick) {
     const out = [];
     for (const d of days) {
-      const dt = new Date(d.day + "T00:00:00Z");
-      const monday = new Date(dt); monday.setUTCDate(dt.getUTCDate() - ((dt.getUTCDay() + 6) % 7));
-      const key = monday.toISOString().slice(0, 10);
+      let key = d.day, label = fmtDay(d.day), title = fmtDay(d.day);
+      if (weekly) {
+        const dt = new Date(d.day + "T00:00:00Z");
+        dt.setUTCDate(dt.getUTCDate() - ((dt.getUTCDay() + 6) % 7));
+        key = dt.toISOString().slice(0, 10); label = fmtDay(key); title = `Week of ${fmtDay(key)}`;
+      }
       let b = out[out.length - 1];
-      if (!b || b.key !== key) { b = { key, label: fmtDay(key), title: `Week of ${fmtDay(key)}`, values: {} }; out.push(b); }
-      for (const [k, v] of Object.entries(d.training_h)) b.values[k] = +((b.values[k] || 0) + v).toFixed(2);
+      if (!b || b.key !== key) { b = { key, label, title, values: {} }; out.push(b); }
+      for (const [k, v] of Object.entries(pick(d) || {})) b.values[k] = +((b.values[k] || 0) + v).toFixed(2);
     }
     return out;
   }
+  const trainingBuckets = (days, weekly) => bucketize(days, weekly, (d) => d.training_h);
 
   // ---------- render ----------
 
@@ -271,6 +364,8 @@
       [weekly ? "Week of" : "Day", ...series.map((s) => s.label), "Total"],
       buckets.map((b) => [b.label, ...series.map((s) => b.values[s.key] ? fmtHours(b.values[s.key]) : "–"),
         fmtHours(series.reduce((t, s) => t + (b.values[s.key] || 0), 0))]), 1);
+
+    renderInsights(d, weekly);
 
     const pts = (field) => d.days.map((x) => ({ label: fmtDay(x.day), value: x[field] }));
     bars($("sleep"), pts("sleep_h"), fmtHours, { extra: (i) => d.days[i].sleep_score != null ? [["Sleep score", d.days[i].sleep_score]] : [] });
@@ -327,6 +422,153 @@
     if (s < 5400) return `${Math.round(s / 60)} min ago`;
     if (s < 129600) return `${Math.round(s / 3600)} h ago`;
     return `${Math.round(s / 86400)} days ago`;
+  }
+
+  // ---------- training insights ----------
+
+  // Garmin primary-benefit groups, low to high intensity, on the ordinal ramp.
+  const BENEFITS = [
+    { key: "recovery", label: "Recovery", color: "--int-1" },
+    { key: "base", label: "Aerobic base", color: "--int-2" },
+    { key: "tempo", label: "Tempo / threshold", color: "--int-3" },
+    { key: "vo2max", label: "VO2 max", color: "--int-4" },
+    { key: "anaerobic", label: "Anaerobic / speed", color: "--int-5" },
+    { key: "unrated", label: "Not rated", color: "--series-other" },
+  ];
+  const INTENSITY = [
+    { key: "easy", label: "Easy", color: "--int-1" },
+    { key: "moderate", label: "Moderate", color: "--int-3" },
+    { key: "hard", label: "Hard", color: "--int-5" },
+  ];
+  const RUN_KINDS = [
+    { key: "easy", label: "Easy", color: "--series-1" },
+    { key: "long", label: "Long", color: "--series-2" },
+    { key: "quality", label: "Quality (intervals, tempo, VO2 max)", color: "--series-3" },
+  ];
+
+  const legend = (series) => series.map((s) => `<li><i style="background:var(${s.color})"></i>${esc(s.label)}</li>`).join("");
+  const stat = (k, v, sub = "") => `<div class="stat"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="d">${esc(sub)}</div></div>`;
+  const fmtPace = (s) => {
+    if (s == null) return "–";
+    s = Math.round(s);
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = String(s % 60).padStart(2, "0");
+    return h ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
+  };
+  const prettyExercise = (c) => c === "UNKNOWN" ? "Unlabelled" : c.toLowerCase().replace(/_/g, " ").replace(/^./, (x) => x.toUpperCase());
+  // Garmin's training-effect scale (0-5).
+  const teWord = (v) => v == null ? "" : v < 1 ? "No benefit" : v < 2 ? "Minor benefit" : v < 3 ? "Maintaining"
+    : v < 4 ? "Improving" : v < 5 ? "Highly improving" : "Overreaching";
+  // "vs previous" for times where lower is better (pace splits).
+  const vsPrev = (cur, prev, n, fmt) => {
+    if (cur == null || prev == null) return "";
+    const diff = cur - prev;
+    if (Math.abs(diff) < 1) return `Same as previous ${n} days`;
+    return `${diff < 0 ? "▼" : "▲"} ${fmt(Math.abs(diff))} ${diff < 0 ? "faster" : "slower"} than previous ${n} days`;
+  };
+  // Dark or light text for a label sitting on a filled segment.
+  function inkOn(colorVar) {
+    const hex = getComputedStyle(document.documentElement).getPropertyValue(colorVar).trim().replace("#", "");
+    if (hex.length !== 6) return "#fff";
+    const [r, g, b] = [0, 2, 4].map((i) => { const c = parseInt(hex.slice(i, i + 2), 16) / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.35 ? "#0b0b0b" : "#ffffff";
+  }
+
+  function renderInsights(d, weekly) {
+    const ins = d.insights, prev = d.previous_insights, n = d.range.days, unit = weekly ? "week" : "day";
+
+    // Training effect mix
+    const eff = bucketize(d.days, weekly, (x) => x.benefit_h);
+    const effSeries = BENEFITS.filter((s) => eff.some((b) => b.values[s.key] > 0));
+    $("effectNote").textContent = `Hours per ${unit} by Garmin's primary benefit, easiest to hardest`;
+    $("effectLegend").innerHTML = legend(effSeries);
+    stackedBars($("effect"), eff, effSeries, fmtHours);
+    const hoursOf = (key) => d.days.reduce((t, x) => t + (x.benefit_h[key] || 0), 0);
+    const allH = BENEFITS.reduce((t, s) => t + hoursOf(s.key), 0);
+    const hardH = ["tempo", "vo2max", "anaerobic"].reduce((t, k) => t + hoursOf(k), 0);
+    $("effectStats").innerHTML =
+      stat("Avg aerobic effect", fmtNum(ins.aerobic_te, 1), teWord(ins.aerobic_te)) +
+      stat("Avg anaerobic effect", fmtNum(ins.anaerobic_te, 1), teWord(ins.anaerobic_te)) +
+      stat("Tempo or harder", allH ? `${Math.round(100 * hardH / allH)}%` : "–", "of training time");
+    $("effectTable").innerHTML = table([weekly ? "Week of" : "Day", ...effSeries.map((s) => s.label)],
+      eff.map((b) => [b.label, ...effSeries.map((s) => b.values[s.key] ? fmtHours(b.values[s.key]) : "–")]), 1);
+
+    // Intensity vs 80/20
+    const p = ins.intensity_pct;
+    $("zoneLegend").innerHTML = legend(INTENSITY);
+    if (p.easy == null) {
+      $("zoneSplit").innerHTML = `<div class="empty">No heart-rate data in this range</div>`;
+      $("zoneVerdict").innerHTML = ""; $("zoneTable").innerHTML = "";
+    } else {
+      const barRow = (name, parts, marker) => `<div class="row"><div class="name">${name}</div><div class="bar">` +
+        INTENSITY.filter((s) => parts[s.key] > 0).map((s) =>
+          `<div class="seg" style="width:${parts[s.key]}%;background:var(${s.color});color:${inkOn(s.color)}" title="${s.label}: ${parts[s.key]}%">` +
+          `${parts[s.key] >= 12 ? parts[s.key] + "%" : ""}</div>`).join("") +
+        (marker ? `<div class="target" style="left:calc(80% - 1px)" title="80% easy target"></div>` : "") + `</div></div>`;
+      $("zoneSplit").innerHTML = barRow("You", p, true) + barRow("Target", { easy: 80, moderate: 0, hard: 20 }, false);
+      const tips = [];
+      if (p.easy < 75) tips.push(`Only ${p.easy}% of your heart-rate time is easy. Aim for about 80%: slow easy sessions down to zone 2.`);
+      if (p.moderate > 20) tips.push(`${p.moderate}% is in zone 3, the "grey zone": hard enough to tire you, too easy to build speed.`);
+      if (p.hard < 10) tips.push(`Only ${p.hard}% is hard. One interval or tempo session a week would fix that.`);
+      if (!tips.length) tips.push("Close to 80/20. Keep easy days easy and hard days hard.");
+      const pp = prev.intensity_pct;
+      if (pp.easy != null) tips.push(`Previous ${n} days: ${pp.easy}% easy, ${pp.moderate}% moderate, ${pp.hard}% hard.`);
+      $("zoneVerdict").innerHTML = tips.map((t) => `<li>${esc(t)}</li>`).join("");
+      const zt = ins.zones_min.reduce((a, b) => a + b, 0) || 1;
+      $("zoneTable").innerHTML = table(["Zone", "Time", "Share"],
+        ins.zones_min.map((m, i) => [`Zone ${i + 1}`, fmtHours(m / 60), `${Math.round(100 * m / zt)}%`]), 1);
+    }
+
+    // Strength volume
+    const st = bucketize(d.days, weekly, (x) => x.strength);
+    const s = ins.strength;
+    $("strengthNote").textContent = `Sets per ${unit}`;
+    $("strengthStats").innerHTML =
+      stat("Sessions", fmtNum(s.sessions), `${fmtNum(s.per_week, 1)} per week`) +
+      stat("Sets per session", s.sessions ? fmtNum(s.sets / s.sessions) : "–", `${fmtNum(s.sets)} total`) +
+      stat("Reps", fmtNum(s.reps), prev.strength.sessions ? `${fmtNum(prev.strength.sessions)} sessions previous ${n} days` : "");
+    if (s.sessions) {
+      bars($("strength"), st.map((b) => ({ label: b.label, title: b.title, value: b.values.sets || 0 })), (v) => `${fmtNum(v)} sets`,
+        { name: "Sets", extra: (i) => [["Sessions", fmtNum(st[i].values.sessions || 0)], ["Reps", fmtNum(st[i].values.reps || 0)]] });
+    } else {
+      $("strength").innerHTML = `<div class="empty">No strength sessions in this range</div>`;
+    }
+    const top = s.top_exercises, maxSets = Math.max(1, ...top.map((e) => e.sets));
+    $("exercises").innerHTML = top.length ? top.map((e) =>
+      `<li title="${esc(prettyExercise(e.exercise))}: ${e.sets} sets, ${e.reps} reps"><span class="lbl">${esc(prettyExercise(e.exercise))}</span>` +
+      `<span class="track"><span class="fill" style="display:block;width:${100 * e.sets / maxSets}%"></span></span><span class="val">${e.sets} sets</span></li>`).join("")
+      : `<li class="empty">No exercises recorded</li>`;
+    $("strengthTable").innerHTML = table([weekly ? "Week of" : "Day", "Sessions", "Sets", "Reps"],
+      st.map((b) => [b.label, fmtNum(b.values.sessions || 0), fmtNum(b.values.sets || 0), fmtNum(b.values.reps || 0)]), 1) +
+      table(["Exercise", "Sets", "Reps"], top.map((e) => [prettyExercise(e.exercise), fmtNum(e.sets), fmtNum(e.reps)]), 1);
+
+    // Running
+    const r = ins.runs, pr = prev.runs;
+    const rk = bucketize(d.days, weekly, (x) => x.run_km);
+    const runSeries = RUN_KINDS.filter((k) => rk.some((b) => b.values[k.key] > 0));
+    $("runNote").textContent = `Kilometres per ${unit}, by type of run`;
+    $("runLegend").innerHTML = legend(runSeries);
+    $("runStats").innerHTML =
+      stat("Runs", fmtNum(r.count), `${fmtNum(r.per_week, 1)} per week`) +
+      stat("Distance", `${fmtNum(r.km, 1)} km`, pr.count ? `${fmtNum(pr.km, 1)} km previous ${n} days` : "") +
+      stat("Longest run", r.count ? `${fmtNum(r.longest_km, 1)} km` : "–", `${r.long} long · ${r.quality} quality · ${r.easy} easy`) +
+      stat("Best 1 km", fmtPace(r.best_1k_s), vsPrev(r.best_1k_s, pr.best_1k_s, n, fmtPace)) +
+      stat("Best 5 km", fmtPace(r.best_5k_s), vsPrev(r.best_5k_s, pr.best_5k_s, n, fmtPace)) +
+      stat("Best 10 km", fmtPace(r.best_10k_s), vsPrev(r.best_10k_s, pr.best_10k_s, n, fmtPace));
+    if (r.count) {
+      stackedBars($("runs"), rk, runSeries, (v) => `${fmtNum(v, 1)} km`, { tick: (v) => `${+v.toFixed(1)}`, empty: "No run" });
+    } else {
+      $("runs").innerHTML = `<div class="empty">No runs in this range</div>`;
+    }
+    const tips = [];
+    if (r.per_week < 3) tips.push(`${fmtNum(r.per_week, 1)} runs a week. Building to 3 (one easy, one quality, one long) is the biggest lever for running fitness.`);
+    if (!r.quality) tips.push("No quality runs. Try intervals (e.g. 5 × 1 km at 5 km pace, 2–3 min jog between) or a 20-minute tempo in zone 4.");
+    else if (r.count && r.quality / r.count > 0.4) tips.push(`${r.quality} of ${r.count} runs were quality sessions. Keep most runs easy so you recover for the hard ones.`);
+    if (!r.long) tips.push("No long run (10 km+ or 75 min+). Add one easy long run a week, building about 1 km a week.");
+    else tips.push(`Longest run ${fmtNum(r.longest_km, 1)} km. Build by about 1 km a week, kept easy.`);
+    $("runVerdict").innerHTML = r.count ? tips.map((t) => `<li>${esc(t)}</li>`).join("") : "";
+    $("runTable").innerHTML = table([weekly ? "Week of" : "Day", ...RUN_KINDS.map((k) => k.label.split(" (")[0]), "Total"],
+      rk.map((b) => [b.label, ...RUN_KINDS.map((k) => b.values[k.key] ? `${fmtNum(b.values[k.key], 1)} km` : "–"),
+        `${fmtNum(RUN_KINDS.reduce((t, k) => t + (b.values[k.key] || 0), 0), 1)} km`]), 1);
   }
 
   // ---------- chart primitives (plain SVG) ----------
@@ -415,11 +657,13 @@
   }
   const barGeom = (f, i) => { const w = Math.max(2, Math.min(f.band - Math.max(2, f.band * 0.28), 36)); return { x: M.left + f.band * i + (f.band - w) / 2, w }; };
 
-  function stackedBars(el, buckets, series, fmt) {
+  function stackedBars(el, buckets, series, fmt, opts = {}) {
+    const tick = opts.tick || ((v) => `${+v.toFixed(2)}h`);
+    const empty = opts.empty || "Rest day";
     const totals = buckets.map((b) => series.reduce((t, s) => t + (b.values[s.key] || 0), 0));
     const f = frame(el, buckets.length);
     const { max, step } = niceScale(Math.max(...totals, 0.5));
-    const y = axes(f, buckets.map((b) => b.label), 0, max, step, (v) => `${+v.toFixed(2)}h`);
+    const y = axes(f, buckets.map((b) => b.label), 0, max, step, tick);
     buckets.forEach((b, i) => {
       const { x, w } = barGeom(f, i);
       let base = y(0);
@@ -439,7 +683,7 @@
       const b = buckets[i];
       const rows = series.filter((s) => b.values[s.key] > 0).map((s) => [s.label, fmt(b.values[s.key])]);
       rows.push(["Total", fmt(totals[i])]);
-      return { title: b.title, rows: totals[i] ? rows : [["Rest day", ""]], x: M.left + f.band * (i + 0.5), y: y(totals[i]) };
+      return { title: b.title, rows: totals[i] ? rows : [[empty, ""]], x: M.left + f.band * (i + 0.5), y: y(totals[i]) };
     });
   }
 
@@ -455,8 +699,8 @@
       node(f.svg, "path", { d: topRounded(x, y(p.value), w, y(0) - y(p.value), 4), style: "fill:var(--series-1)" });
     });
     hover(f, el, points.length, (i) => ({
-      title: points[i].label,
-      rows: [["Value", fmt(points[i].value)], ...(opts.extra ? opts.extra(i) : [])],
+      title: points[i].title || points[i].label,
+      rows: [[opts.name || "Value", fmt(points[i].value)], ...(opts.extra ? opts.extra(i) : [])],
       x: M.left + f.band * (i + 0.5), y: y(points[i].value ?? 0),
     }));
   }

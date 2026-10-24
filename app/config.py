@@ -5,6 +5,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class Config:
     token: str
+    dashboard_username: str
     dashboard_password: str  # empty = dashboard locked
     db_path: str
     port: int
@@ -21,6 +22,7 @@ class Config:
             raise SystemExit("MCP_TOKEN must be set to a random string of at least 24 characters")
         return cls(
             token=token,
+            dashboard_username=os.environ.get("DASHBOARD_USERNAME", "dan").strip(),
             dashboard_password=os.environ.get("DASHBOARD_PASSWORD", "").strip(),
             db_path=os.environ.get("DB_PATH", "/data/garmin.db"),
             port=int(os.environ.get("PORT", "8000")),

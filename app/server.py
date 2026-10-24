@@ -8,7 +8,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from . import dashboard
-from .auth import Auth
+from .auth import Auth, Sessions
 from .config import Config
 from .db import Database
 from .sources import make_source
@@ -39,7 +39,7 @@ def _iso_bounds(start: date, end: date) -> tuple[str, str]:
     return f"{start.isoformat()}T00:00:00", f"{(end + timedelta(days=1)).isoformat()}T00:00:00"
 
 
-def build_server(db: Database, syncer: Syncer) -> FastMCP:
+def build_server(db: Database, syncer: Syncer, sessions: Sessions) -> FastMCP:
     mcp = FastMCP(
         "garmin",
         instructions=(
@@ -56,7 +56,7 @@ def build_server(db: Database, syncer: Syncer) -> FastMCP:
     async def health(_: Request) -> JSONResponse:
         return JSONResponse({"status": "ok"})
 
-    dashboard.register(mcp, db)
+    dashboard.register(mcp, db, sessions)
 
     @mcp.tool()
     def list_activities(
@@ -129,7 +129,8 @@ def main() -> None:
         logging.info("removed %d sample-data rows", n)
     syncer = Syncer(db, source, cfg.sync_interval_min, cfg.initial_days, cfg.lookback_days)
     syncer.start()
-    app = Auth(build_server(db, syncer).streamable_http_app(), cfg.token, cfg.dashboard_password)
+    sessions = Sessions(cfg.dashboard_username, cfg.dashboard_password, cfg.token)
+    app = Auth(build_server(db, syncer, sessions).streamable_http_app(), cfg.token, sessions)
     uvicorn.run(app, host="0.0.0.0", port=cfg.port, log_level="info")
 
 

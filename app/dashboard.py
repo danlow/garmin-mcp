@@ -5,11 +5,14 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 from starlette.requests import Request
-from starlette.responses import HTMLResponse, JSONResponse
+from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse
 
+from . import insights
+from .auth import LOGIN_PATH, LOGOUT_PATH, SESSION_DAYS, Sessions
 from .db import Database
 
 PAGE = Path(__file__).parent / "static" / "dashboard.html"
+LOGIN_PAGE = Path(__file__).parent / "static" / "login.html"
 RANGES = (7, 30, 90)
 
 
@@ -47,6 +50,9 @@ def _window(db: Database, start: date, end: date) -> dict:
             row["resting_hr"] = data.get("resting_hr")
             row["steps"] = data.get("steps")
 
+    detailed = db.activities_with_raw(lo, hi)
+    insights.add_daily(days, detailed)
+
     rows = list(days.values())
     totals = {
         "activities": len(activities),
@@ -57,10 +63,34 @@ def _window(db: Database, start: date, end: date) -> dict:
         "resting_hr": _mean([r["resting_hr"] for r in rows]),
         "steps": _mean([r["steps"] for r in rows]),
     }
-    return {"days": rows, "totals": totals, "activities": activities}
+    n_days = (end - start).days + 1
+    return {"days": rows, "totals": totals, "activities": activities, "insights": insights.summary(detailed, n_days)}
 
 
-def register(mcp: FastMCP, db: Database) -> None:
+def register(mcp: FastMCP, db: Database, sessions: Sessions) -> None:
+    @mcp.custom_route(LOGIN_PATH, methods=["GET"])
+    async def login_page(_: Request) -> HTMLResponse:
+        return HTMLResponse(LOGIN_PAGE.read_text(encoding="utf-8"))
+
+    @mcp.custom_route(LOGIN_PATH, methods=["POST"])
+    async def login(request: Request) -> RedirectResponse:
+        client = request.client.host if request.client else "unknown"
+        if sessions.locked_out(client):
+            return RedirectResponse(f"{LOGIN_PATH}?error=locked", status_code=303)
+        form = await request.form()
+        if not sessions.check(str(form.get("username", "")), str(form.get("password", ""))):
+            sessions.record_failure(client)
+            return RedirectResponse(f"{LOGIN_PATH}?error=invalid", status_code=303)
+        response = RedirectResponse("/dashboard", status_code=303)
+        response.headers["set-cookie"] = sessions.set_cookie(sessions.issue(), SESSION_DAYS * 86400)
+        return response
+
+    @mcp.custom_route(LOGOUT_PATH, methods=["GET", "POST"])
+    async def logout(_: Request) -> RedirectResponse:
+        response = RedirectResponse(LOGIN_PATH, status_code=303)
+        response.headers["set-cookie"] = sessions.set_cookie("", 0)
+        return response
+
     @mcp.custom_route("/dashboard", methods=["GET"])
     async def page(_: Request) -> HTMLResponse:
         return HTMLResponse(PAGE.read_text(encoding="utf-8"))
@@ -81,6 +111,8 @@ def register(mcp: FastMCP, db: Database) -> None:
             "days": current["days"],
             "totals": current["totals"],
             "previous_totals": previous["totals"],
+            "insights": current["insights"],
+            "previous_insights": previous["insights"],
             "recent_activities": current["activities"][:15],
             "sync": db.sync_overview(),
         })

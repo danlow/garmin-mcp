@@ -118,6 +118,15 @@ class Database:
         with self._tx() as c:
             return [dict(r) for r in c.execute(sql, args)]
 
+    def activities_with_raw(self, start: str, end: str) -> list[dict]:
+        """Activities starting in [start, end), oldest first, with the full Garmin summary parsed."""
+        with self._tx() as c:
+            rows = c.execute(
+                "SELECT start_time, activity_type, duration_s, distance_m, raw_json FROM activities "
+                "WHERE start_time >= ? AND start_time < ? ORDER BY start_time", (start, end)).fetchall()
+        return [{**{k: r[k] for k in ("start_time", "activity_type", "duration_s", "distance_m")},
+                 "raw": json.loads(r["raw_json"])} for r in rows]
+
     def get_activity(self, activity_id: str) -> dict | None:
         with self._tx() as c:
             row = c.execute("SELECT * FROM activities WHERE id = ?", (activity_id,)).fetchone()

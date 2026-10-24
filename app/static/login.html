@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign In</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --border: rgba(11, 11, 11, 0.12);
+    --accent: #2a78d6;
+    --error: #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page: #0d0d0d;
+      --surface: #1a1a19;
+      --text-primary: #f0efec;
+      --text-secondary: #c3c2b7;
+      --border: rgba(255, 255, 255, 0.12);
+      --accent: #3987e5;
+      --error: #e66767;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --text-primary: #f0efec;
+    --text-secondary: #c3c2b7;
+    --border: rgba(255, 255, 255, 0.12);
+    --accent: #3987e5;
+    --error: #e66767;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px;
+    background: var(--page); color: var(--text-primary);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  form { width: 100%; max-width: 360px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 28px 24px; }
+  h1 { font-size: 20px; font-weight: 650; margin: 0 0 4px; }
+  p { color: var(--text-secondary); margin: 0 0 20px; font-size: 14px; }
+  label { display: block; font-size: 13px; color: var(--text-secondary); margin: 14px 0 6px; }
+  input { width: 100%; font: inherit; color: inherit; background: var(--page); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+  input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button { width: 100%; margin-top: 22px; font: inherit; font-weight: 600; color: #fff; background: var(--accent); border: 0; border-radius: 8px; padding: 11px; cursor: pointer; }
+  .error { color: var(--error); font-size: 14px; margin: 12px 0 0; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+  <form method="post" action="/dashboard/login">
+    <h1>Fitness dashboard</h1>
+    <p>Sign in to see your Garmin data.</p>
+    <label for="username">Username</label>
+    <input id="username" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus>
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
+    <div class="error" id="error" role="alert" hidden></div>
+    <button type="submit">Sign in</button>
+  </form>
+<script>
+  const reason = new URLSearchParams(location.search).get("error");
+  const messages = { invalid: "Wrong username or password.", locked: "Too many attempts. Wait a minute and try again." };
+  if (messages[reason]) { const e = document.getElementById("error"); e.textContent = messages[reason]; e.hidden = false; }
+</script>
+</body>
+</html>
