@@ -122,6 +122,7 @@
   .section-title { grid-column: 1 / -1; font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
                    color: var(--text-secondary); margin: 12px 0 -4px; }
 
+  .subhead { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin: 18px 0 6px; }
   .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px 16px; margin: 4px 0 14px; }
   .stat .k { color: var(--text-secondary); font-size: 12px; }
   .stat .v { font-size: 18px; font-weight: 600; }
@@ -208,15 +209,18 @@
         <div class="chart" id="effect"></div>
         <details><summary>Show as table</summary><div class="scroll" id="effectTable"></div></details>
       </article>
-      <article class="card">
+      <article class="card wide">
         <h2>Intensity vs 80/20</h2>
-        <p class="note">Share of heart-rate time: easy (zones 1–2), moderate (zone 3), hard (zones 4–5)</p>
+        <p class="note">Heart-rate time: easy (zones 1–2), moderate (zone 3), hard (zones 4–5). Time below zone 1, such as rests between sets, isn't counted.</p>
+        <div class="stats" id="zoneStats"></div>
         <ul class="legend" id="zoneLegend"></ul>
         <div class="split" id="zoneSplit"></div>
+        <h3 class="subhead" id="zoneVolumeTitle">Volume by intensity</h3>
+        <div class="chart" id="zoneVolume"></div>
         <ul class="verdict" id="zoneVerdict"></ul>
         <details><summary>Show as table</summary><div class="scroll" id="zoneTable"></div></details>
       </article>
-      <article class="card">
+      <article class="card wide">
         <h2>Strength volume</h2>
         <p class="note" id="strengthNote">Sets per day</p>
         <div class="stats" id="strengthStats"></div>
@@ -492,13 +496,28 @@
     $("effectTable").innerHTML = table([weekly ? "Week of" : "Day", ...effSeries.map((s) => s.label)],
       eff.map((b) => [b.label, ...effSeries.map((s) => b.values[s.key] ? fmtHours(b.values[s.key]) : "–")]), 1);
 
-    // Intensity vs 80/20
+    // Intensity vs 80/20, with volume (hours) alongside the shares
     const p = ins.intensity_pct;
+    const byIntensity = (z) => ({ easy: (z[0] + z[1]) / 60, moderate: z[2] / 60, hard: (z[3] + z[4]) / 60 });
+    const sumH = (g) => g.easy + g.moderate + g.hard;
+    const vol = byIntensity(ins.zones_min), prevVol = byIntensity(prev.zones_min);
+    const volH = sumH(vol), prevH = sumH(prevVol), weeks = n / 7;
+    const change = (cur, before) => before > 0
+      ? (Math.abs(cur - before) / before < 0.005 ? `Same as previous ${n} days`
+        : `${cur > before ? "▲" : "▼"} ${Math.round(100 * Math.abs(cur - before) / before)}% vs previous ${n} days`)
+      : `No data for previous ${n} days`;
+    $("zoneStats").innerHTML =
+      stat("Total heart-rate time", fmtHours(volH), `${fmtHours(volH / weeks)} per week · ${change(volH, prevH)}`) +
+      INTENSITY.map((s) => stat(s.label, fmtHours(vol[s.key]), `${fmtHours(vol[s.key] / weeks)} per week · ${change(vol[s.key], prevVol[s.key])}`)).join("");
+    const zv = bucketize(d.days, weekly, (x) => byIntensity(x.zones_min));
+    $("zoneVolumeTitle").textContent = `Volume by intensity, hours per ${unit}`;
     $("zoneLegend").innerHTML = legend(INTENSITY);
     if (p.easy == null) {
       $("zoneSplit").innerHTML = `<div class="empty">No heart-rate data in this range</div>`;
+      $("zoneVolume").innerHTML = "";
       $("zoneVerdict").innerHTML = ""; $("zoneTable").innerHTML = "";
     } else {
+      stackedBars($("zoneVolume"), zv, INTENSITY, fmtHours, { empty: "No heart-rate data" });
       const barRow = (name, parts, marker) => `<div class="row"><div class="name">${name}</div><div class="bar">` +
         INTENSITY.filter((s) => parts[s.key] > 0).map((s) =>
           `<div class="seg" style="width:${parts[s.key]}%;background:var(${s.color});color:${inkOn(s.color)}" title="${s.label}: ${parts[s.key]}%">` +
@@ -510,12 +529,21 @@
       if (p.moderate > 20) tips.push(`${p.moderate}% is in zone 3, the "grey zone": hard enough to tire you, too easy to build speed.`);
       if (p.hard < 10) tips.push(`Only ${p.hard}% is hard. One interval or tempo session a week would fix that.`);
       if (!tips.length) tips.push("Close to 80/20. Keep easy days easy and hard days hard.");
+      if (prevH > 0) {
+        const pct = Math.round(100 * (volH - prevH) / prevH);
+        tips.push(`Volume: ${fmtHours(volH / weeks)} a week, ${pct >= 0 ? "up" : "down"} ${Math.abs(pct)}% on the previous ${n} days` +
+          (pct > 30 ? ". That's a big jump: raise volume gradually (around 10% a week) to stay injury-free." : "."));
+        if (vol.easy < prevVol.easy && vol.moderate > prevVol.moderate)
+          tips.push("Easy hours went down while zone 3 hours went up. Shift that time back into easy sessions.");
+      }
       const pp = prev.intensity_pct;
       if (pp.easy != null) tips.push(`Previous ${n} days: ${pp.easy}% easy, ${pp.moderate}% moderate, ${pp.hard}% hard.`);
       $("zoneVerdict").innerHTML = tips.map((t) => `<li>${esc(t)}</li>`).join("");
       const zt = ins.zones_min.reduce((a, b) => a + b, 0) || 1;
-      $("zoneTable").innerHTML = table(["Zone", "Time", "Share"],
-        ins.zones_min.map((m, i) => [`Zone ${i + 1}`, fmtHours(m / 60), `${Math.round(100 * m / zt)}%`]), 1);
+      $("zoneTable").innerHTML = table(["Zone", "Time", "Share", `Previous ${n} days`],
+        ins.zones_min.map((m, i) => [`Zone ${i + 1}`, fmtHours(m / 60), `${Math.round(100 * m / zt)}%`, fmtHours(prev.zones_min[i] / 60)]), 1) +
+        table([weekly ? "Week of" : "Day", ...INTENSITY.map((s) => s.label), "Total"],
+          zv.map((b) => [b.label, ...INTENSITY.map((s) => fmtHours(b.values[s.key] || 0)), fmtHours(sumH({ easy: 0, moderate: 0, hard: 0, ...b.values }))]), 1);
     }
 
     // Strength volume

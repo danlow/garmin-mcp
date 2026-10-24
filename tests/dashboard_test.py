@@ -44,14 +44,18 @@ check(s == 200 and b'autocomplete="username"' in body and b'autocomplete="curren
       "sign-in form should be served with password-manager hints")
 print("signed out: page redirects to sign-in, API 401 without a browser prompt, form has autofill hints")
 
-# Wrong credentials.
+# Wrong credentials. Each run makes 2 failed attempts; the lockout (5 a minute) kicks in if
+# this test is run 3 times within a minute, which is also a rejection.
 for u, p in ((USER, "wrong"), ("someone-else", PW)):
     s, h, _ = login(u, p)
-    check(s == 303 and h["location"].endswith("error=invalid") and "set-cookie" not in h, f"bad login {u!r} accepted")
+    check(s == 303 and "set-cookie" not in h, f"bad login {u!r} was not rejected: {s} {h}")
+    check(h["location"].endswith(("error=invalid", "error=locked")), f"unexpected redirect {h['location']}")
 print("wrong password or username: rejected, no cookie")
 
 # Right credentials: cookie, then the page and API work with it.
 s, h, _ = login(USER, PW)
+if h.get("location", "").endswith("error=locked"):
+    raise SystemExit("LOCKED OUT: too many failed sign-ins from repeated test runs; wait 60 s and run again")
 cookie = h.get("set-cookie", "")
 check(s == 303 and h["location"] == "/dashboard" and "HttpOnly" in cookie and "SameSite=Strict" in cookie, f"login: {s} {h}")
 session = cookie.split(";")[0]
@@ -72,8 +76,11 @@ print("right login: HttpOnly session cookie; page and all three ranges load with
 
 # A tampered cookie is refused; the cookie doesn't open the MCP endpoint.
 name, value = session.split("=", 1)
-s, _, _ = req("GET", "/dashboard", {"Cookie": f"{name}={value[:-1]}0"})
-check(s == 303, f"tampered cookie should be refused, got {s}")
+expires, sig = value.split(".", 1)
+flipped = sig[:-1] + ("1" if sig[-1] == "0" else "0")  # always differs from the real signature
+for bad in (f"{expires}.{flipped}", f"{int(expires) + 86400 * 365}.{sig}", f"{expires}.{'0' * len(sig)}"):
+    s, _, _ = req("GET", "/dashboard", {"Cookie": f"{name}={bad}"})
+    check(s == 303, f"tampered cookie {bad[:12]}... should be refused, got {s}")
 s, _, _ = req("POST", "/mcp", {"Cookie": session, "Content-Type": "application/json"}, "{}")
 check(s == 401, f"session cookie must not open /mcp, got {s}")
 print("tampered cookie refused; session cookie doesn't open /mcp")
